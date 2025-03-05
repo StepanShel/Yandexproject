@@ -49,7 +49,9 @@ func (server *Server) HandleCalculate(w http.ResponseWriter, r *http.Request) {
 	}
 	var request Request
 	if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
-		respJson(w, errors.New("invalid data"), 422)
+		if err := respJson(w, errors.New("invalid data"), 422); err != nil {
+			fmt.Println(err)
+		}
 		return
 	}
 	defer r.Body.Close()
@@ -59,7 +61,9 @@ func (server *Server) HandleCalculate(w http.ResponseWriter, r *http.Request) {
 	server.expressions[id] = &Expression{ID: id, Status: "processing"}
 	server.mu.Unlock()
 
-	respJson(w, id, 201)
+	if err := respJson(w, id, 201); err != nil {
+		fmt.Println(err)
+	}
 	go func() {
 		fmt.Println("start parsing") ///AAA
 		err := server.startParsingExpression(request.Expression, id)

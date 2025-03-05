@@ -37,12 +37,10 @@ func (agent *Agent) Worker(id int) {
 		resp, err := client.Get(fmt.Sprint("http://localhost:", agent.port, "/internal/task"))
 		if err != nil {
 			time.Sleep(time.Second * 3)
-			fmt.Println("agent cant connect")
 			continue
 		}
 		if resp.StatusCode == http.StatusNotFound {
 			resp.Body.Close()
-			fmt.Println("No tasks to count")
 			time.Sleep(time.Second * 3)
 			continue
 		}
