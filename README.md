@@ -30,7 +30,7 @@
 ### 1. Клонирование репозитория
 
 ```bash
-git clone https://github.com/git clone https://github.com/StepanShel/Yandexproject
+git clone https://github.com/StepanShel/Yandexproject
 ```
 ```
 cd Yandexproject
