@@ -33,7 +33,6 @@ func respJson(w http.ResponseWriter, data any, errCode int) error {
 	w.WriteHeader(errCode)
 
 	if err := json.NewEncoder(w).Encode(resp); err != nil {
-		fmt.Println("err1", err.Error())
 		return err
 	}
 
@@ -138,7 +137,6 @@ func (server *Server) HandleTaskGet(w http.ResponseWriter, r *http.Request) {
 
 // endpoint POST internal/task
 func (server *Server) HandleTaskPost(w http.ResponseWriter, r *http.Request) {
-	fmt.Println("Task Post")
 	if r.Method != http.MethodPost {
 		respJson(w, errors.New("unsupported method"), 405)
 		return
@@ -152,7 +150,6 @@ func (server *Server) HandleTaskPost(w http.ResponseWriter, r *http.Request) {
 	}
 	defer r.Body.Close()
 	server.Agentch <- result
-	fmt.Println("отправлено в агент ч")
 	w.WriteHeader(http.StatusOK)
 }
 
@@ -215,7 +212,6 @@ func (server *Server) startParsingExpression(expression, id string) error {
 		defer wg.Done()
 		for agentresp := range server.Agentch {
 			resultch <- agentresp
-			fmt.Println("resultch <- agentresp")
 		}
 	}()
 
