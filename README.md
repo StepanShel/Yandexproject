@@ -31,6 +31,8 @@
 
 ```bash
 git clone https://github.com/git clone https://github.com/StepanShel/Yandexproject
+```
+```
 cd Yandexproject
 ```
 
