@@ -48,9 +48,5 @@ func NewServer() *Server {
 		expressions: make(map[string]*Expression),
 		tasks:       make([]parser.Task, 0),
 		Config:      config.ConfigFromEnv(),
-		Agentch:     make(chan parser.Result, 100),
 	}
-}
-func (server *Server) Shutdown() {
-	close(server.Agentch)
 }

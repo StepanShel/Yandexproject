@@ -139,6 +139,7 @@ func ParsingAST(node *Node, cfg *config.Config, tasksch chan Task, resultchan ch
 	for result = range resultchan {
 		if result.Id == task.ID {
 			node.value = fmt.Sprintf("%v", result.Res)
+			fmt.Println("resId = taskId")
 			return result.Res, nil
 		}
 	}

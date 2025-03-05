@@ -64,16 +64,17 @@ func (server *Server) HandleCalculate(w http.ResponseWriter, r *http.Request) {
 	if err := respJson(w, id, 201); err != nil {
 		fmt.Println(err)
 	}
+
 	go func() {
-		fmt.Println("start parsing") ///AAA
+		fmt.Println("start parsing")
 		err := server.startParsingExpression(request.Expression, id)
 		if err != nil {
 			server.mu.Lock()
 			server.expressions[id].Status = "error"
 			server.mu.Unlock()
-			fmt.Println("parsing failed:", err) //AAA
+			fmt.Println("parsing failed:", err)
 		} else {
-			fmt.Println("parsing completed successfully") //AAA
+			fmt.Println("parsing completed successfully")
 		}
 	}()
 }
@@ -137,6 +138,7 @@ func (server *Server) HandleTaskGet(w http.ResponseWriter, r *http.Request) {
 
 // endpoint POST internal/task
 func (server *Server) HandleTaskPost(w http.ResponseWriter, r *http.Request) {
+	fmt.Println("Task Post")
 	if r.Method != http.MethodPost {
 		respJson(w, errors.New("unsupported method"), 405)
 		return
@@ -150,12 +152,15 @@ func (server *Server) HandleTaskPost(w http.ResponseWriter, r *http.Request) {
 	}
 	defer r.Body.Close()
 	server.Agentch <- result
+	fmt.Println("отправлено в агент ч")
 	w.WriteHeader(http.StatusOK)
 }
 
 func (server *Server) startParsingExpression(expression, id string) error {
 	tasksch := make(chan parser.Task, server.Config.CompPower)
 	resultch := make(chan parser.Result, server.Config.CompPower)
+	server.Agentch = make(chan parser.Result, server.Config.CompPower)
+	defer close(server.Agentch)
 	defer close(tasksch)
 	defer close(resultch)
 
@@ -210,6 +215,7 @@ func (server *Server) startParsingExpression(expression, id string) error {
 		defer wg.Done()
 		for agentresp := range server.Agentch {
 			resultch <- agentresp
+			fmt.Println("resultch <- agentresp")
 		}
 	}()
 

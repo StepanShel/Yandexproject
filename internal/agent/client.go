@@ -48,7 +48,7 @@ func (agent *Agent) Worker(id int) {
 			AgTask `json:"task"`
 		}
 		json.NewDecoder(resp.Body).Decode(&taskResp)
-		fmt.Println("Worker ", id, "recieved task", taskResp)
+		fmt.Println("Worker ", id, "recieved task", taskResp.Arg1, taskResp.Operation, taskResp.Arg2)
 		resp.Body.Close()
 
 		result, err := Calculate(taskResp.Operation, taskResp.OperationTime, taskResp.Arg1, taskResp.Arg2)
@@ -63,7 +63,7 @@ func (agent *Agent) Worker(id int) {
 		}
 		buffer, _ := json.Marshal(response)
 		respPost, err := client.Post(fmt.Sprint("http://localhost:", agent.port, "/internal/task"), "application/json", bytes.NewReader(buffer))
-		fmt.Println("Agent send a ans", response)
+		fmt.Println("Agent send an ans", response.Res)
 		if err != nil {
 			fmt.Println("error")
 			continue
