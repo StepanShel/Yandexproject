@@ -43,7 +43,7 @@ export TIME_ADDITION_MS=300
 export TIME_SUBTRACTION_MS=300
 export TIME_MULTIPLICATION_MS=300
 export TIME_DIVISION_MS=400
-export PORT=8080
+export PORT=8081
 ```
 
 Команда для запуска:
