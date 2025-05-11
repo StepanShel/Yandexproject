@@ -69,20 +69,19 @@ func (server *Server) HandleCalculate(w http.ResponseWriter, r *http.Request) {
 		Status:     "processing",
 	}
 
-	if err := server.repo.CreateExpression(expr); err != nil {
+	if err := server.Repo.CreateExpression(expr); err != nil {
 		respJson(w, errors.New("failed to save expression"), http.StatusInternalServerError)
 		return
 	}
 
-	if err := respJson(w, id, 201); err != nil {
-		fmt.Println(err)
-	}
-
+	wg := sync.WaitGroup{}
+	wg.Add(1)
 	go func() {
+		defer wg.Done()
 		fmt.Println("start parsing")
 		err := server.startParsingExpression(request.Expression, id)
 		if err != nil {
-			if updateErr := server.repo.UpdateExpressionResult(id, 0, "error"); updateErr != nil {
+			if updateErr := server.Repo.UpdateExpressionResult(id, 0, "error"); updateErr != nil {
 				fmt.Println("failed to update expression status:", updateErr)
 			}
 			fmt.Println("parsing failed:", err)
@@ -90,6 +89,10 @@ func (server *Server) HandleCalculate(w http.ResponseWriter, r *http.Request) {
 			fmt.Println("parsing completed successfully")
 		}
 	}()
+	wg.Wait()
+	if err := respJson(w, id.String(), 201); err != nil {
+		fmt.Println(err)
+	}
 }
 
 // endpoint api/v1/expressions
@@ -105,8 +108,9 @@ func (server *Server) HandleExpressions(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	expressions, err := server.repo.GetExpressions(username)
+	expressions, err := server.Repo.GetExpressions(username)
 	if err != nil {
+		fmt.Println(err)
 		respJson(w, errors.New("failed to get expressions"), http.StatusInternalServerError)
 		return
 	}
@@ -139,7 +143,7 @@ func (server *Server) HandleExpressionsById(w http.ResponseWriter, r *http.Reque
 	path := strings.Split(r.URL.Path, "/")
 	id, _ := uuid.Parse(path[4])
 
-	expr, err := server.repo.GetExpressionByID(id)
+	expr, err := server.Repo.GetExpressionByID(id)
 	if err != nil {
 		respJson(w, errors.New("expression not found"), 404)
 		return
@@ -247,13 +251,13 @@ func (server *Server) startParsingExpression(expression string, id uuid.UUID) er
 	wg.Wait()
 
 	if parseErr != nil {
-		if err := server.repo.UpdateExpressionResult(id, 0, "error"); err != nil {
+		if err := server.Repo.UpdateExpressionResult(id, 0, "error"); err != nil {
 			return fmt.Errorf("update status error: %v, original error: %v", err, parseErr)
 		}
 		return parseErr
 	}
-
-	if err := server.repo.UpdateExpressionResult(id, int(result), "DONE"); err != nil {
+	fmt.Println(">>>>>>")
+	if err := server.Repo.UpdateExpressionResult(id, int(result), "DONE"); err != nil {
 		return err
 	}
 

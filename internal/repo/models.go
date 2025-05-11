@@ -1,6 +1,8 @@
 package repo
 
-import "github.com/google/uuid"
+import (
+	"github.com/google/uuid"
+)
 
 type User struct {
 	Username string `json:"username"`

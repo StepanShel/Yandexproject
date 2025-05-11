@@ -37,7 +37,7 @@ type Expression struct {
 }
 
 type Server struct {
-	repo    *repo.Repo
+	Repo    *repo.Repo
 	mu      sync.Mutex
 	tasks   []parser.Task
 	Agentch chan parser.Result
@@ -45,14 +45,14 @@ type Server struct {
 }
 
 func NewServer() *Server {
-	repo, err := repo.NewRepository()
+	Repo, err := repo.NewRepository()
 	if err != nil {
 		fmt.Printf("failed to init repository: %v", err)
 		return nil
 	}
 
 	return &Server{
-		repo:   repo,
+		Repo:   Repo,
 		tasks:  make([]parser.Task, 0),
 		Config: config.ConfigFromEnv(),
 	}

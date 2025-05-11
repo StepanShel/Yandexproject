@@ -2,6 +2,7 @@ package repo
 
 import (
 	"database/sql"
+	"fmt"
 
 	"github.com/google/uuid"
 	_ "github.com/mattn/go-sqlite3"
@@ -13,7 +14,7 @@ type Repo struct {
 }
 
 func NewRepository() (*Repo, error) {
-	db, err := sql.Open("sqlite3", "TODO")
+	db, err := sql.Open("sqlite3", "math.db")
 	if err != nil {
 		return nil, err
 	}
@@ -106,21 +107,25 @@ func (r *Repo) Authenticate(username, password string) (bool, error) {
 func (r *Repo) CreateExpression(expr *Expression) error {
 	expr.ID = uuid.New()
 	_, err := r.db.Exec(
-		"INSERT INTO expressions (id, username, expression, status) VALUES ($1, $2, $3, $4)",
+		"INSERT INTO expressions (id, username, expression, result, status) VALUES ($1, $2, $3, 0, $4)",
 		expr.ID.String(), expr.Username, expr.Expression, expr.Status)
 	return err
 }
 
 func (r *Repo) UpdateExpressionResult(id uuid.UUID, result int, status string) error {
 	_, err := r.db.Exec(
-		"UPDATE expressions SET result = ?, status = ? WHERE id = ?",
+		"UPDATE expressions SET result = $1, status = $2 WHERE id = $3",
 		result, status, id.String())
+	fmt.Println(err)
 	return err
 }
 
 func (r *Repo) GetExpressions(username string) ([]Expression, error) {
 	rows, err := r.db.Query(
-		"SELECT id, expression, result, status, created_at FROM expressions WHERE username = ?",
+		`SELECT id, username, expression, 
+         COALESCE(result, 0) as result,  
+         status, created_at 
+         FROM expressions WHERE username = ?`,
 		username)
 	if err != nil {
 		return nil, err
