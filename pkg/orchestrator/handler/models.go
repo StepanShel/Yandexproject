@@ -1,8 +1,10 @@
 package handler
 
 import (
+	"fmt"
 	"sync"
 
+	"github.com/StepanShel/YandexProject/internal/repo"
 	"github.com/StepanShel/YandexProject/pkg/orchestrator/config"
 	"github.com/StepanShel/YandexProject/pkg/orchestrator/parser"
 )
@@ -29,24 +31,29 @@ type ResponseExprs struct {
 }
 
 type Expression struct {
-	ID     string   `json:"id"`
-	Status string   `json:"status"`
-	Result *float64 `json:"result"`
+	ID     string  `json:"id"`
+	Status string  `json:"status"`
+	Result float64 `json:"result"`
 }
 
 type Server struct {
-	mu          sync.Mutex
-	expressions map[string]*Expression
-	tasks       []parser.Task
-	Agentch     chan parser.Result
-	Config      *config.Config
+	repo    *repo.Repo
+	mu      sync.Mutex
+	tasks   []parser.Task
+	Agentch chan parser.Result
+	Config  *config.Config
 }
 
 func NewServer() *Server {
+	repo, err := repo.NewRepository()
+	if err != nil {
+		fmt.Printf("failed to init repository: %v", err)
+		return nil
+	}
+
 	return &Server{
-		mu:          sync.Mutex{},
-		expressions: make(map[string]*Expression),
-		tasks:       make([]parser.Task, 0),
-		Config:      config.ConfigFromEnv(),
+		repo:   repo,
+		tasks:  make([]parser.Task, 0),
+		Config: config.ConfigFromEnv(),
 	}
 }

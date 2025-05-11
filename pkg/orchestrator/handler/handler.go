@@ -8,6 +8,7 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/StepanShel/YandexProject/internal/repo"
 	parser "github.com/StepanShel/YandexProject/pkg/orchestrator/parser"
 	uuid "github.com/google/uuid"
 )
@@ -26,8 +27,8 @@ func respJson(w http.ResponseWriter, data any, errCode int) error {
 		resp = ResponseExprs{Exprs: data}
 	case parser.Task:
 		resp = map[string]parser.Task{"task": data}
-	case *Expression:
-		resp = map[string]*Expression{"Expression": data}
+	case Expression:
+		resp = map[string]Expression{"Expression": data}
 	}
 
 	w.WriteHeader(errCode)
@@ -41,24 +42,37 @@ func respJson(w http.ResponseWriter, data any, errCode int) error {
 
 // endpoint api/v1/calculate
 func (server *Server) HandleCalculate(w http.ResponseWriter, r *http.Request) {
-
 	if r.Method != http.MethodPost {
 		respJson(w, errors.New("unsupported method"), 405)
 		return
 	}
+
+	username, ok := r.Context().Value("username").(string)
+	if !ok {
+		respJson(w, errors.New("unauthorized"), http.StatusUnauthorized)
+		return
+	}
+
 	var request Request
 	if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
-		if err := respJson(w, errors.New("invalid data"), 422); err != nil {
-			fmt.Println(err)
-		}
+		respJson(w, errors.New("invalid data"), 422)
 		return
 	}
 	defer r.Body.Close()
 
-	id := uuid.New().String()
-	server.mu.Lock()
-	server.expressions[id] = &Expression{ID: id, Status: "processing"}
-	server.mu.Unlock()
+	id := uuid.New()
+
+	expr := &repo.Expression{
+		ID:         id,
+		Username:   username,
+		Expression: request.Expression,
+		Status:     "processing",
+	}
+
+	if err := server.repo.CreateExpression(expr); err != nil {
+		respJson(w, errors.New("failed to save expression"), http.StatusInternalServerError)
+		return
+	}
 
 	if err := respJson(w, id, 201); err != nil {
 		fmt.Println(err)
@@ -68,9 +82,9 @@ func (server *Server) HandleCalculate(w http.ResponseWriter, r *http.Request) {
 		fmt.Println("start parsing")
 		err := server.startParsingExpression(request.Expression, id)
 		if err != nil {
-			server.mu.Lock()
-			server.expressions[id].Status = "error"
-			server.mu.Unlock()
+			if updateErr := server.repo.UpdateExpressionResult(id, 0, "error"); updateErr != nil {
+				fmt.Println("failed to update expression status:", updateErr)
+			}
 			fmt.Println("parsing failed:", err)
 		} else {
 			fmt.Println("parsing completed successfully")
@@ -85,36 +99,62 @@ func (server *Server) HandleExpressions(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	server.mu.Lock()
-	defer server.mu.Unlock()
-
-	var expressions = []Expression{}
-	for _, expr := range server.expressions {
-		expressions = append(expressions, *expr)
+	username, ok := r.Context().Value("username").(string)
+	if !ok {
+		respJson(w, errors.New("unauthorized"), http.StatusUnauthorized)
+		return
 	}
 
-	respJson(w, expressions, 200)
+	expressions, err := server.repo.GetExpressions(username)
+	if err != nil {
+		respJson(w, errors.New("failed to get expressions"), http.StatusInternalServerError)
+		return
+	}
 
+	var result []Expression
+	for _, expr := range expressions {
+		result = append(result, Expression{
+			ID:     expr.ID.String(),
+			Result: float64(expr.Result),
+			Status: expr.Status,
+		})
+	}
+
+	respJson(w, result, 200)
 }
 
 // endpoint api/v1/expressions/:id
 func (server *Server) HandleExpressionsById(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
-		w.WriteHeader(http.StatusMethodNotAllowed)
 		respJson(w, errors.New("unsupported method"), 405)
 		return
 	}
 
-	server.mu.Lock()
-	defer server.mu.Unlock()
-	path := strings.Split(r.URL.Path, "/")
-
-	id := path[4]
-	exp, ok := server.expressions[id]
+	username, ok := r.Context().Value("username").(string)
 	if !ok {
-		respJson(w, errors.New("expression not found"), 400)
+		respJson(w, errors.New("unauthorized"), http.StatusUnauthorized)
+		return
 	}
-	respJson(w, exp, 200)
+
+	path := strings.Split(r.URL.Path, "/")
+	id, _ := uuid.Parse(path[4])
+
+	expr, err := server.repo.GetExpressionByID(id)
+	if err != nil {
+		respJson(w, errors.New("expression not found"), 404)
+		return
+	}
+
+	if expr.Username != username {
+		respJson(w, errors.New("access denied"), http.StatusForbidden)
+		return
+	}
+
+	respJson(w, Expression{
+		ID:     expr.ID.String(),
+		Result: float64(expr.Result),
+		Status: expr.Status,
+	}, 200)
 }
 
 // endpoint GET internal/task
@@ -153,7 +193,7 @@ func (server *Server) HandleTaskPost(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 }
 
-func (server *Server) startParsingExpression(expression, id string) error {
+func (server *Server) startParsingExpression(expression string, id uuid.UUID) error {
 	tasksch := make(chan parser.Task, server.Config.CompPower)
 	resultch := make(chan parser.Result, server.Config.CompPower)
 	server.Agentch = make(chan parser.Result, server.Config.CompPower)
@@ -169,24 +209,15 @@ func (server *Server) startParsingExpression(expression, id string) error {
 	if err != nil {
 		return err
 	}
+
 	var wg sync.WaitGroup
+	var result float64
+	var parseErr error
 
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		var res float64
-		res, err := parser.ParsingAST(node, server.Config, tasksch, resultch)
-		if err != nil {
-			server.mu.Lock()
-			server.expressions[id].Status = "error"
-			server.mu.Unlock()
-			return
-		}
-
-		server.mu.Lock()
-		server.expressions[id].Result = &res
-		server.expressions[id].Status = "DONE"
-		server.mu.Unlock()
+		result, parseErr = parser.ParsingAST(node, server.Config, tasksch, resultch)
 	}()
 
 	wg.Add(1)
@@ -195,9 +226,7 @@ func (server *Server) startParsingExpression(expression, id string) error {
 		for task := range tasksch {
 			if task.Err != nil {
 				fmt.Println("Task error:", task.Err)
-				server.mu.Lock()
-				server.expressions[id].Status = "error"
-				server.mu.Unlock()
+				parseErr = task.Err
 				return
 			}
 
@@ -208,7 +237,7 @@ func (server *Server) startParsingExpression(expression, id string) error {
 	}()
 
 	wg.Add(1)
-	func() {
+	go func() {
 		defer wg.Done()
 		for agentresp := range server.Agentch {
 			resultch <- agentresp
@@ -216,6 +245,17 @@ func (server *Server) startParsingExpression(expression, id string) error {
 	}()
 
 	wg.Wait()
+
+	if parseErr != nil {
+		if err := server.repo.UpdateExpressionResult(id, 0, "error"); err != nil {
+			return fmt.Errorf("update status error: %v, original error: %v", err, parseErr)
+		}
+		return parseErr
+	}
+
+	if err := server.repo.UpdateExpressionResult(id, int(result), "DONE"); err != nil {
+		return err
+	}
 
 	return nil
 }
