@@ -1,7 +1,4 @@
 # Распределённый вычислитель арифметических выражений
-
-Этот проект реализует веб-сервис, который принимает математические выражения через HTTP-запросы, вычисляет их (конкурентно) и возвращает результат. Сервис состоит из двух компонентов: **оркестратора** и **агента**. Оркестратор принимает выражения и разбивает их на подзадачи, которые затем отправляет агенту для вычисления.
-
 ---
 
 ## Содержание
@@ -46,7 +43,7 @@ export TIME_ADDITION_MS=300
 export TIME_SUBTRACTION_MS=300
 export TIME_MULTIPLICATION_MS=300
 export TIME_DIVISION_MS=400
-export PORT=8080
+export PORT=8081
 ```
 
 Команда для запуска:
@@ -65,16 +62,32 @@ Orchestrator is running on http://localhost:8081
 
 ## Примеры использования
 
-### 1. Отправка выражения
+### 1. Вначале нужно зарегестрироваться:
+
+```bash
+curl -X POST http://localhost:8081/api/v1/register \
+  -H "Content-Type: application/json" \
+  -d '{"login":"your-login","password":"your-password"}'
+```
+
+### 2. Затем нужно залогиниться:
+
+```bash
+curl -X POST http://localhost:8081/api/v1/login \
+  -H "Content-Type: application/json" \
+  -d '{"login":"your-login","password":"your-password"}'
+```
+После вы получите свой JWT токен, который далее нужно использовать при запросах
+
+### 3. Отправка выражения
 
 Отправьте выражение на вычисление:
 
 ```bash
-curl --location 'http://localhost:8081/api/v1/calculate' \
---header 'Content-Type: application/json' \
---data '{
-  "expression": "2*2+2"
-}'
+curl -X POST http://localhost:8081/api/v1/calculate \
+  -H "Authorization: YOUR_JWT_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"expression":"2+2*2"}'
 ```
 
 Ответ:
@@ -89,7 +102,8 @@ curl --location 'http://localhost:8081/api/v1/calculate' \
 Проверьте статус всех выражений:
 
 ```bash
-curl --location 'http://localhost:8081/api/v1/expressions'
+curl -X GET http://localhost:8080/api/v1/expressions \
+  -H "Authorization: Bearer YOUR_TOKEN"
 ```
 
 Ответ:
@@ -110,7 +124,8 @@ curl --location 'http://localhost:8081/api/v1/expressions'
 Получите результат по ID выражения:
 
 ```bash
-curl --location 'http://localhost:8081/api/v1/expressions/0948c874-da79-4418-b01c-09817ed1d569'
+curl --location 'http://localhost:8081/api/v1/expressions/0948c874-da79-4418-b01c-09817ed1d569' \
+   -H "Authorization: Bearer YOUR_TOKEN"
 ```
 
 Ответ:
