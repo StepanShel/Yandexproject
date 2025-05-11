@@ -74,10 +74,11 @@ func (server *Server) HandleCalculate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	wg := sync.WaitGroup{}
-	wg.Add(1)
+	if err := respJson(w, id.String(), 201); err != nil {
+		fmt.Println(err)
+	}
+
 	go func() {
-		defer wg.Done()
 		fmt.Println("start parsing")
 		err := server.startParsingExpression(request.Expression, id)
 		if err != nil {
@@ -89,10 +90,6 @@ func (server *Server) HandleCalculate(w http.ResponseWriter, r *http.Request) {
 			fmt.Println("parsing completed successfully")
 		}
 	}()
-	wg.Wait()
-	if err := respJson(w, id.String(), 201); err != nil {
-		fmt.Println(err)
-	}
 }
 
 // endpoint api/v1/expressions

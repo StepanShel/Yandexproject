@@ -14,7 +14,7 @@ type Repo struct {
 }
 
 func NewRepository() (*Repo, error) {
-	db, err := sql.Open("sqlite3", "math.db")
+	db, err := sql.Open("sqlite3", "math")
 	if err != nil {
 		return nil, err
 	}
@@ -137,7 +137,7 @@ func (r *Repo) GetExpressions(username string) ([]Expression, error) {
 		var expr Expression
 		var idStr string
 
-		err := rows.Scan(&idStr, &expr.Expression, &expr.Result, &expr.Status, &expr.CreatedAt)
+		err := rows.Scan(&idStr, &expr.Username, &expr.Expression, &expr.Result, &expr.Status, &expr.CreatedAt)
 		if err != nil {
 			return nil, err
 		}
@@ -147,7 +147,6 @@ func (r *Repo) GetExpressions(username string) ([]Expression, error) {
 			return nil, err
 		}
 
-		expr.Username = username
 		expressions = append(expressions, expr)
 	}
 
