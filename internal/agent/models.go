@@ -1,5 +1,7 @@
 package agent
 
+import grpc "github.com/StepanShel/YandexProject/internal/agent/gRPC"
+
 type AgTask struct {
 	ID            string  `json:"id"`
 	Arg1          float64 `json:"arg1"`
@@ -14,6 +16,6 @@ type Response struct {
 }
 
 type Agent struct {
+	client    *grpc.Client
 	compPower int
-	port      int
 }

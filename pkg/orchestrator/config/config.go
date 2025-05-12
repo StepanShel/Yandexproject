@@ -11,7 +11,6 @@ type Config struct {
 	Subtime       int
 	MultiplicTime int
 	Divtime       int
-	CompPower     int
 }
 
 func getEnv(key string, defaultValue int) int {

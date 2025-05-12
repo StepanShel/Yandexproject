@@ -6,6 +6,7 @@ import (
 
 	"github.com/StepanShel/YandexProject/internal/repo"
 	"github.com/StepanShel/YandexProject/pkg/orchestrator/config"
+	grpc "github.com/StepanShel/YandexProject/pkg/orchestrator/gRPC"
 	"github.com/StepanShel/YandexProject/pkg/orchestrator/parser"
 )
 
@@ -37,14 +38,15 @@ type Expression struct {
 }
 
 type Server struct {
-	Repo    *repo.Repo
-	mu      sync.Mutex
-	tasks   []parser.Task
-	Agentch chan parser.Result
-	Config  *config.Config
+	grpcServer *grpc.Server
+	Repo       *repo.Repo
+	mu         sync.Mutex
+	tasks      []parser.Task
+	Agentch    chan parser.Result
+	Config     *config.Config
 }
 
-func NewServer() *Server {
+func NewServer(grpcServer *grpc.Server) *Server {
 	Repo, err := repo.NewRepository()
 	if err != nil {
 		fmt.Printf("failed to init repository: %v", err)
@@ -52,8 +54,9 @@ func NewServer() *Server {
 	}
 
 	return &Server{
-		Repo:   Repo,
-		tasks:  make([]parser.Task, 0),
-		Config: config.ConfigFromEnv(),
+		grpcServer: grpcServer,
+		Repo:       Repo,
+		tasks:      make([]parser.Task, 0),
+		Config:     config.ConfigFromEnv(),
 	}
 }

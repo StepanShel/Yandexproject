@@ -10,6 +10,7 @@ import (
 
 	"github.com/StepanShel/YandexProject/internal/repo"
 	parser "github.com/StepanShel/YandexProject/pkg/orchestrator/parser"
+	"github.com/StepanShel/YandexProject/proto/calc"
 	uuid "github.com/google/uuid"
 )
 
@@ -158,47 +159,9 @@ func (server *Server) HandleExpressionsById(w http.ResponseWriter, r *http.Reque
 	}, 200)
 }
 
-// endpoint GET internal/task
-func (server *Server) HandleTaskGet(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodGet {
-		respJson(w, errors.New("unsupported method"), 405)
-		return
-	}
-	if len(server.tasks) == 0 {
-		respJson(w, errors.New("no tasks available"), 404)
-		return
-	}
-	server.mu.Lock()
-	defer server.mu.Unlock()
-	task := server.tasks[0]
-	server.tasks = server.tasks[1:]
-
-	respJson(w, task, 200)
-}
-
-// endpoint POST internal/task
-func (server *Server) HandleTaskPost(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPost {
-		respJson(w, errors.New("unsupported method"), 405)
-		return
-	}
-
-	var result parser.Result
-
-	if err := json.NewDecoder(r.Body).Decode(&result); err != nil {
-		respJson(w, errors.New("invalid data"), 422)
-		return
-	}
-	defer r.Body.Close()
-	server.Agentch <- result
-	w.WriteHeader(http.StatusOK)
-}
-
 func (server *Server) startParsingExpression(expression string, id uuid.UUID) error {
-	tasksch := make(chan parser.Task, server.Config.CompPower)
-	resultch := make(chan parser.Result, server.Config.CompPower)
-	server.Agentch = make(chan parser.Result, server.Config.CompPower)
-	defer close(server.Agentch)
+	tasksch := make(chan *calc.Task, 100)
+	resultch := make(chan *calc.Result, 100)
 	defer close(tasksch)
 	defer close(resultch)
 
@@ -225,23 +188,17 @@ func (server *Server) startParsingExpression(expression string, id uuid.UUID) er
 	go func() {
 		defer wg.Done()
 		for task := range tasksch {
-			if task.Err != nil {
-				fmt.Println("Task error:", task.Err)
-				parseErr = task.Err
-				return
-			}
-
-			server.mu.Lock()
-			server.tasks = append(server.tasks, task)
-			server.mu.Unlock()
+			server.grpcServer.Tasks <- task
 		}
 	}()
 
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		for agentresp := range server.Agentch {
-			resultch <- agentresp
+		for {
+			select {
+			case resultch <- <-server.grpcServer.AgentCh:
+			}
 		}
 	}()
 
@@ -253,7 +210,6 @@ func (server *Server) startParsingExpression(expression string, id uuid.UUID) er
 		}
 		return parseErr
 	}
-	fmt.Println(">>>>>>")
 	if err := server.Repo.UpdateExpressionResult(id, int(result), "DONE"); err != nil {
 		return err
 	}

@@ -6,6 +6,7 @@ import (
 	"strconv"
 
 	"github.com/StepanShel/YandexProject/pkg/orchestrator/config"
+	"github.com/StepanShel/YandexProject/proto/calc"
 	uuid "github.com/google/uuid"
 )
 
@@ -89,9 +90,7 @@ func Ast(tokens []string) (*Node, error) {
 	return stack[0], nil
 }
 
-func ParsingAST(node *Node, cfg *config.Config, tasksch chan Task, resultchan chan Result) (float64, error) {
-	var task = Task{}
-	var divByZeroeErr error
+func ParsingAST(node *Node, cfg *config.Config, tasksch chan *calc.Task, resultchan chan *calc.Result) (float64, error) {
 	operationTime := map[string]int{
 		"+": cfg.AddTime,
 		"-": cfg.Subtime,
@@ -119,27 +118,21 @@ func ParsingAST(node *Node, cfg *config.Config, tasksch chan Task, resultchan ch
 	if err != nil {
 		return 0, err
 	}
-	if rightresult == 0 && node.value == "/" {
-		divByZeroeErr = errors.New("DIV BY ZERO")
-	} else {
-		divByZeroeErr = nil
-	}
-	task = Task{
-		ID:            uuid.NewString(),
-		Arg1:          leftresult,
-		Arg2:          rightresult,
+	task := &calc.Task{
+		Id:            uuid.New().String(),
+		Arg1:          float32(leftresult),
+		Arg2:          float32(rightresult),
 		Operation:     node.value,
-		OperationTime: operationTime[node.value],
-		Err:           divByZeroeErr,
+		OperationTime: int32(operationTime[node.value]),
 	}
 
 	tasksch <- task
 
-	var result = Result{}
+	var result = &calc.Result{}
 	for result = range resultchan {
-		if result.Id == task.ID {
-			node.value = fmt.Sprintf("%v", result.Res)
-			return result.Res, nil
+		if result.TaskId == task.Id {
+			node.value = fmt.Sprintf("%v", result.Result)
+			return float64(result.Result), nil
 		}
 	}
 	return 0, errors.New("how")
